@@ -49,7 +49,18 @@ jobs:
       run: |
         cd android
         ./gradlew assembleDebug --no-daemon
-        
+        # - name: Create Release
+#   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+#   uses: softprops/action-gh-release@v1
+#   with:
+#     tag_name: v${{ github.run_number }}
+#     name: Release v${{ github.run_number }}
+#     files: android/app/build/outputs/apk/debug/app-debug.apk
+#     draft: false
+#     prerelease: false
+#   env:
+#     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
