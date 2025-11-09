@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1761468531511,
+      "tag": "0000_remarkable_pet_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1761503086061,
+      "tag": "0001_lethal_sharon_carter",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1761509074368,
+      "tag": "0002_productive_vulture",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1761510813764,
+      "tag": "0003_clever_master_mold",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1761512613461,
+      "tag": "0004_sweet_loki",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1761722203236,
+      "tag": "0005_clear_malice",
+      "breakpoints": true
+    }
+  ]
+}

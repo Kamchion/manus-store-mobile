@@ -1,0 +1,276 @@
+import { useState, useMemo } from "react";
+import { trpc } from "../lib/trpc";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
+import { Minus, Plus, ShoppingCart } from "lucide-react";
+
+interface ProductVariantsModalProps {
+  product: any;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function ProductVariantsModal({
+  product,
+  isOpen,
+  onClose,
+}: ProductVariantsModalProps) {
+  const [selectedVariants, setSelectedVariants] = useState<
+    Record<string, string>
+  >({});
+  const [quantity, setQuantity] = useState(1);
+
+  // Fetch variants for this product
+  const { data: variants = [], isLoading } = trpc.products.getVariants.useQuery(
+    { productId: product.id },
+    { enabled: isOpen && !!product.id }
+  );
+
+  // Add to cart mutation
+  const addToCartMutation = trpc.cart.addItem.useMutation({
+    onSuccess: () => {
+      onClose();
+      setQuantity(1);
+      setSelectedVariants({});
+    },
+  });
+
+  // Group variants by type (Talla, Color, etc.)
+  const variantsByType = useMemo(() => {
+    const grouped: Record<string, typeof variants> = {};
+    variants.forEach((variant) => {
+      if (!grouped[variant.variantType]) {
+        grouped[variant.variantType] = [];
+      }
+      grouped[variant.variantType].push(variant);
+    });
+    return grouped;
+  }, [variants]);
+
+  // Find the selected variant based on all selections
+  const selectedVariant = useMemo(() => {
+    if (Object.keys(selectedVariants).length === 0) return null;
+
+    // For products with single variant type
+    if (Object.keys(variantsByType).length === 1) {
+      const variantType = Object.keys(variantsByType)[0];
+      const selectedValue = selectedVariants[variantType];
+      return variants.find(
+        (v) => v.variantType === variantType && v.variantValue === selectedValue
+      );
+    }
+
+    // For products with multiple variant types, we need to match all selected types
+    // This is a simplified approach - in production you might need a more complex matching
+    return variants.find((v) => {
+      const selectedValue = selectedVariants[v.variantType];
+      return selectedValue === v.variantValue;
+    });
+  }, [selectedVariants, variants, variantsByType]);
+
+  const handleAddToCart = () => {
+    if (!selectedVariant) return;
+
+    addToCartMutation.mutate({
+      productId: selectedVariant.id,
+      quantity,
+    });
+  };
+
+  const handleQuantityChange = (delta: number) => {
+    const newQty = quantity + delta;
+    if (newQty >= 1 && (!selectedVariant || newQty <= selectedVariant.stock)) {
+      setQuantity(newQty);
+    }
+  };
+
+  const isAddDisabled =
+    !selectedVariant ||
+    selectedVariant.stock < quantity ||
+    addToCartMutation.isLoading;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">{product.name}</DialogTitle>
+          <DialogDescription>
+            SKU: {product.sku} | Categoría: {product.category}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Product Image */}
+          {product.image && (
+            <div className="w-full h-64 overflow-hidden rounded-lg bg-gray-100">
+              <img
+                src={product.image}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          {/* Price */}
+          <div className="text-3xl font-bold text-blue-600">
+            ${parseFloat(product.rolePrice || product.basePrice || "0").toFixed(2)}
+          </div>
+
+          {/* Description */}
+          {product.description && (
+            <p className="text-gray-600">{product.description}</p>
+          )}
+
+          {/* Loading state */}
+          {isLoading && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Cargando opciones...</p>
+            </div>
+          )}
+
+          {/* Variant Selectors */}
+          {!isLoading && Object.entries(variantsByType).map(([type, options]) => (
+            <div key={type} className="space-y-2">
+              <Label className="text-lg font-semibold">{type}</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {options.map((option) => {
+                  const isSelected = selectedVariants[type] === option.variantValue;
+                  const isOutOfStock = option.stock === 0;
+
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => {
+                        if (!isOutOfStock) {
+                          setSelectedVariants((prev) => ({
+                            ...prev,
+                            [type]: option.variantValue,
+                          }));
+                        }
+                      }}
+                      disabled={isOutOfStock}
+                      className={`
+                        p-3 rounded-lg border-2 transition-all text-sm
+                        ${isSelected
+                          ? "border-blue-600 bg-blue-50 text-blue-700 font-semibold"
+                          : isOutOfStock
+                          ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                          : "border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                        }
+                      `}
+                    >
+                      <div>{option.variantValue}</div>
+                      {option.sku && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {option.sku}
+                        </div>
+                      )}
+                      <div className="text-xs mt-1">
+                        {isOutOfStock ? (
+                          <span className="text-red-500">Agotado</span>
+                        ) : (
+                          <span className="text-green-600">
+                            {option.stock} disponibles
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Selected Variant Info */}
+          {selectedVariant && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm font-semibold text-green-800">
+                Selección actual:
+              </p>
+              <p className="text-sm text-green-700">
+                {Object.entries(selectedVariants)
+                  .map(([type, value]) => `${type}: ${value}`)
+                  .join(" | ")}
+              </p>
+              <p className="text-sm text-green-700 mt-1">
+                Stock disponible: {selectedVariant.stock} unidades
+              </p>
+              {selectedVariant.sku && (
+                <p className="text-xs text-green-600 mt-1">
+                  SKU: {selectedVariant.sku}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Quantity Controls */}
+          <div className="space-y-2">
+            <Label className="text-lg font-semibold">Cantidad</Label>
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleQuantityChange(-1)}
+                disabled={quantity <= 1}
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="text-2xl font-semibold w-16 text-center">
+                {quantity}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleQuantityChange(1)}
+                disabled={!selectedVariant || quantity >= selectedVariant.stock}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {selectedVariant && quantity > selectedVariant.stock && (
+              <p className="text-sm text-red-500">
+                Solo hay {selectedVariant.stock} unidades disponibles
+              </p>
+            )}
+          </div>
+
+          {/* Add to Cart Button */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              onClick={handleAddToCart}
+              disabled={isAddDisabled}
+              className="flex-1 h-12 text-lg"
+            >
+              <ShoppingCart className="mr-2 h-5 w-5" />
+              {addToCartMutation.isLoading
+                ? "Agregando..."
+                : "Agregar al Carrito"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="h-12"
+            >
+              Cancelar
+            </Button>
+          </div>
+
+          {/* Validation Messages */}
+          {!selectedVariant && Object.keys(variantsByType).length > 0 && (
+            <p className="text-sm text-amber-600 text-center">
+              Por favor selecciona todas las opciones antes de agregar al carrito
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
